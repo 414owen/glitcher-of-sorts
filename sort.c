@@ -1,8 +1,7 @@
 #define BITS_PER_BYTE 8
-#define DOWN_THRESHOLD 30
-#define UP_THRESHOLD 70
+#define DOWN_THRESHOLD 50 
+#define UP_THRESHOLD 200 
 #include <gdk-pixbuf/gdk-pixbuf.h>
-/* #include <FreeImage.h> */
 #include <gtk/gtk.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -55,7 +54,8 @@ void sort_image(GdkPixbuf* image_buf) {
 	for (unsigned y = 0; y < gdk_pixbuf_get_height(image_buf); y++) {
 		int stages = 0;
 		size_t bp = 0;
-		size_t x = 0;
+		size_t x = gdk_pixbuf_get_width(image_buf) / 2;
+		x += rand() % (x / 3);
 		for (; x < gdk_pixbuf_get_width(image_buf); x++) {
 			guchar* base = addr(x, y, image_buf);
 			if (pix_brightness(base) > UP_THRESHOLD) {
@@ -71,9 +71,17 @@ void sort_image(GdkPixbuf* image_buf) {
 				break;
 			}
 		}
+
+		x += rand() % (400);
+
 		if (stages == 2) {
 			sorted_rows++;
-			qsort(addr(bp, y, image_buf), x - bp, (gdk_pixbuf_get_bits_per_sample(image_buf) / 8) * gdk_pixbuf_get_n_channels(image_buf), cmp_brightness);
+			qsort(
+					addr(bp, y, image_buf), 
+					x - bp, 
+					(gdk_pixbuf_get_bits_per_sample(image_buf) / 8) * gdk_pixbuf_get_n_channels(image_buf), 
+					cmp_brightness
+				 );
 		}
 	}
 	printf("Sorted\n");
@@ -138,9 +146,6 @@ int main(int argc, char *argv[]) {
 	gtk_builder_add_from_file (builder, "window_main.glade", NULL);
 	window = GTK_WIDGET(gtk_builder_get_object(builder, "window_main"));
 	image = GTK_WIDGET(gtk_builder_get_object(builder, "image_display"));
-	/* window = gtk_window_new(GTK_WINDOW_TOPLEVEL); */
-	/* gtk_window_set_title((GtkWindow*) window, "Glitcher of Sorts"); */
-	/* image = gtk_image_new(); */
 	gtk_builder_connect_signals(builder, NULL);
 	gtk_window_present((GtkWindow*) window);
 	gtk_main();
