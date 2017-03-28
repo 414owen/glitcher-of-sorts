@@ -7,6 +7,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Will be used for batching events
+typedef enum EffectType {
+	SINGLE_PIXEL,
+	SINGLE_ROW,
+	SINGLE_COLUMN,
+	WHOLE_IMAGE
+} EffectType;
+
+typedef struct Effect {
+	char* name;
+	void (*function) (GdkPixbuf*, void**);
+	EffectType type;
+} Effect;
+
 static GtkBuilder* builder = NULL; 
 static GtkWidget* window = NULL;
 static GtkWindow* about = NULL;
@@ -117,10 +131,9 @@ void load_image(const char* in) {
 }
 
 void gtk_open_image() {
-	GtkWidget *dialog;
 	GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
-	gint res;
-	dialog = gtk_file_chooser_dialog_new ("Open File",
+	GtkWidget* dialog = gtk_file_chooser_dialog_new(
+			"Open File",
 			(GtkWindow*) window,
 			action,
 			"_Cancel",
@@ -128,9 +141,8 @@ void gtk_open_image() {
 			"_Open",
 			GTK_RESPONSE_ACCEPT,
 			NULL);
-	res = gtk_dialog_run(GTK_DIALOG (dialog));
-	if (res == GTK_RESPONSE_ACCEPT)
-	{
+	gint res = gtk_dialog_run(GTK_DIALOG (dialog));
+	if (res == GTK_RESPONSE_ACCEPT) {
 		char *filename;
 		GtkFileChooser *chooser = GTK_FILE_CHOOSER (dialog);
 		filename = gtk_file_chooser_get_filename (chooser);
