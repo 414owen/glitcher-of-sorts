@@ -10,7 +10,7 @@
 
 static GtkBuilder* builder = NULL; 
 static GtkWidget* window = NULL;
-static GtkWidget* about = NULL;
+static GtkWindow* about = NULL;
 static GtkWidget* image = NULL;
 static GdkPixbuf* image_buf = NULL;
 
@@ -86,14 +86,14 @@ void on_window_main_destroy() {
 
 void gtk_about_hide() {
 	printf("hiding...\n");
-	gtk_widget_hide(about);
+	gtk_window_close(about);
 }
 
 void gtk_about_show() {
 	if (about == NULL) {
-		about = GTK_WIDGET(gtk_builder_get_object(builder, "about_glitcher"));
+		about = GTK_WINDOW(gtk_builder_get_object(builder, "about_glitcher"));
 	}
-	gtk_widget_show(about);
+	gtk_window_present(about);
 }
 
 void load_image(const char* in) {
@@ -120,7 +120,7 @@ void gtk_open_image() {
 			"_Open",
 			GTK_RESPONSE_ACCEPT,
 			NULL);
-	res = gtk_dialog_run (GTK_DIALOG (dialog));
+	res = gtk_dialog_run(GTK_DIALOG (dialog));
 	if (res == GTK_RESPONSE_ACCEPT)
 	{
 		char *filename;
@@ -129,7 +129,7 @@ void gtk_open_image() {
 		load_image(filename);
 		g_free (filename);
 	}
-	gtk_widget_destroy (dialog);
+	gtk_widget_destroy(dialog);
 }
 
 int main(int argc, char *argv[]) {
@@ -138,8 +138,10 @@ int main(int argc, char *argv[]) {
 	gtk_builder_add_from_file (builder, "window_main.glade", NULL);
 	window = GTK_WIDGET(gtk_builder_get_object(builder, "window_main"));
 	image = GTK_WIDGET(gtk_builder_get_object(builder, "image_display"));
+	/* window = gtk_window_new(GTK_WINDOW_TOPLEVEL); */
+	/* gtk_window_set_title((GtkWindow*) window, "Glitcher of Sorts"); */
+	/* image = gtk_image_new(); */
 	gtk_builder_connect_signals(builder, NULL);
-	gtk_widget_show(window);
+	gtk_window_present((GtkWindow*) window);
 	gtk_main();
-	return 0;
 }
