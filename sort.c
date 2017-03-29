@@ -15,17 +15,28 @@ typedef enum EffectType {
 	WHOLE_IMAGE
 } EffectType;
 
+// Used to represent effects in the queue
 typedef struct Effect {
 	char* name;
 	void (*function) (GdkPixbuf*, void**);
 	EffectType type;
 } Effect;
 
-static GtkBuilder* builder = NULL; 
-static GtkWidget* window = NULL;
-static GtkWindow* about = NULL;
-static GtkWidget* image = NULL;
-static GdkPixbuf* image_buf = NULL;
+typedef struct Display {
+	double scale;
+	GdkPixbuf* image;
+	GdkPixbuf* scaled_image;
+} Display;
+
+typedef struct Gui {
+	GtkBuilder* builder; 
+	GtkWidget* window;
+	GtkWindow* about;
+	GtkWidget* image;
+} Gui;
+
+static Display display;
+static Gui gui;
 
 void error(char* message) {
 	fprintf(stderr, "%s\n", message);
@@ -62,15 +73,43 @@ int cmp_brightness(const void* one, const void* two) {
 	else return 1;
 }
 
+void rescale_image() {
+	int height = gdk_pixbuf_get_height(display.image);
+	int width = gdk_pixbuf_get_width(display.image);
+	display.scaled_image = gdk_pixbuf_scale_simple(
+			display.image, 
+			(int) (((double) width) * display.scale),
+			(int) (((double) height) * display.scale),
+			GDK_INTERP_BILINEAR);
+	gtk_image_set_from_pixbuf((GtkImage*) gui.image, display.scaled_image);
+}
+
+void gtk_zoom_one() {
+	display.scale = 1.0;
+	rescale_image();
+}
+
+void gtk_zoom_out() {
+	display.scale -= 0.1;
+	rescale_image();
+}
+
+void gtk_zoom_in() {
+	display.scale += 0.1;
+	rescale_image();
+}
+
 void sort_image(GdkPixbuf* image_buf) {
 	printf("Sorting...\n");
 	unsigned sorted_rows = 0;
-	for (unsigned y = 0; y < gdk_pixbuf_get_height(image_buf); y++) {
+	int height = gdk_pixbuf_get_height(image_buf);
+	int width = gdk_pixbuf_get_width(image_buf);
+	for (unsigned y = 0; y < height; y++) {
 		int stages = 0;
 		size_t bp = 0;
-		size_t x = gdk_pixbuf_get_width(image_buf) / 2;
+		size_t x = width / 2;
 		x += rand() % (x / 3);
-		for (; x < gdk_pixbuf_get_width(image_buf); x++) {
+		for (; x < width; x++) {
 			guchar* base = addr(x, y, image_buf);
 			if (pix_brightness(base) > UP_THRESHOLD) {
 				stages++;
@@ -78,7 +117,7 @@ void sort_image(GdkPixbuf* image_buf) {
 				break;
 			}
 		}
-		for (; x < gdk_pixbuf_get_width(image_buf); x++) {
+		for (; x < width; x++) {
 			guchar* base = addr(x, y, image_buf);
 			if (pix_brightness(base) < DOWN_THRESHOLD) {
 				stages++;
@@ -108,33 +147,34 @@ void on_window_main_destroy() {
 
 void gtk_about_hide() {
 	printf("hiding...\n");
-	gtk_window_close(about);
+	gtk_window_close(gui.about);
 }
 
 void gtk_about_show() {
-	if (about == NULL) {
-		about = GTK_WINDOW(gtk_builder_get_object(builder, "about_glitcher"));
+	if (gui.about == NULL) {
+		gui.about = GTK_WINDOW(gtk_builder_get_object(gui.builder, "about_glitcher"));
 	}
-	gtk_window_present(about);
+	gtk_window_present(gui.about);
 }
 
 void load_image(const char* in) {
 	printf("Loading file: %s\n", in);
 	GError* e = NULL;
-	image_buf = gdk_pixbuf_new_from_file(in, &e);
-	if (image_buf == NULL) {
+	display.image = gdk_pixbuf_new_from_file(in, &e);
+	if (display.image == NULL) {
 		printf("Couldn't load image :(\n");
 		exit(-1);
 	}
-	gtk_image_set_from_pixbuf((GtkImage*) image, image_buf);
-	sort_image(image_buf);
+	display.scaled_image = display.image;
+	display.scale = 1.0;
+	gtk_image_set_from_pixbuf((GtkImage*) gui.image, display.scaled_image);
 }
 
 void gtk_open_image() {
 	GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
 	GtkWidget* dialog = gtk_file_chooser_dialog_new(
 			"Open File",
-			(GtkWindow*) window,
+			(GtkWindow*) gui.window,
 			action,
 			"_Cancel",
 			GTK_RESPONSE_CANCEL,
@@ -152,13 +192,24 @@ void gtk_open_image() {
 	gtk_widget_destroy(dialog);
 }
 
+
+
+void gtk_add_effect() {
+	GtkWidget* dialog = GTK_WIDGET(gtk_builder_get_object(gui.builder, "add_effect_dialog"));
+	gint res = gtk_dialog_run(GTK_DIALOG(dialog));
+	if (res == GTK_RESPONSE_ACCEPT) {
+		printf("accepted\n");
+	}
+	gtk_widget_destroy(dialog);
+}
+
 int main(int argc, char *argv[]) {
 	gtk_init(&argc, &argv);
-	builder = gtk_builder_new();
-	gtk_builder_add_from_file (builder, "window_main.glade", NULL);
-	window = GTK_WIDGET(gtk_builder_get_object(builder, "window_main"));
-	image = GTK_WIDGET(gtk_builder_get_object(builder, "image_display"));
-	gtk_builder_connect_signals(builder, NULL);
-	gtk_window_present((GtkWindow*) window);
+	gui.builder = gtk_builder_new();
+	gtk_builder_add_from_file (gui.builder, "window_main.glade", NULL);
+	gui.window = GTK_WIDGET(gtk_builder_get_object(gui.builder, "window_main"));
+	gui.image = GTK_WIDGET(gtk_builder_get_object(gui.builder, "image_display"));
+	gtk_builder_connect_signals(gui.builder, NULL);
+	gtk_window_present((GtkWindow*) gui.window);
 	gtk_main();
 }
