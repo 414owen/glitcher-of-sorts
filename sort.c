@@ -1,8 +1,8 @@
 #define BITS_PER_BYTE 8
-#define DOWN_THRESHOLD 50 
-#define UP_THRESHOLD 200 
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gtk/gtk.h>
+#include "pixel_sort.h"
+#include "common.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,20 +19,44 @@ typedef struct Strings {
 } Strings;
 Strings strings;
 
-// Will be used for batching effects
+// Will be used for pipelining of effects
 typedef enum EffectType {
-	SINGLE_PIXEL,
-	SINGLE_ROW,
-	SINGLE_COLUMN,
-	WHOLE_IMAGE
+	PIXEL_EFFECT,
+	ROW_EFFECT,
+	COLUMN_EFFECT,
+	IMAGE_EFFECT
 } EffectType;
 
 // Used to represent effects in the queue
 typedef struct Effect {
+
+	// Name of the effect
 	char* name;
-	void (*function) (GdkPixbuf*, void**);
+
+	// Effect function, takesa pointer to the data, the details, and the settings
+	void (*function) (guchar*, ImageDeets*, void*);
+
+	// Takes details, returns the settings
+	void* (*new_settings_struct) (ImageDeets);
+
+	// Takes settings, returns the settings editor
+	GtkWidget* (*new_settings_dialog) (void*);
+
+	// Defines type of effect, used for effect pipelining
 	EffectType type;
+
 } Effect;
+
+const guchar effect_num = 1;
+Effect effects[] = {
+	{
+		.name = "Horizontal Sort", 
+		.function = sort_horizontal, 
+		.new_settings_struct = new_sort_settings_hor,
+		.new_settings_dialog = new_sort_dialog,
+		.type = ROW_EFFECT
+	}
+};
 
 typedef struct Display {
 	double scale;
@@ -55,36 +79,6 @@ static Gui gui;
 void error(char* message) {
 	fprintf(stderr, "%s\n", message);
 	exit(-1);
-}
-
-unsigned min(unsigned a, unsigned b) {
-	if (a < b) {return a;}
-	return b;
-}
-
-unsigned max(unsigned a, unsigned b) {
-	if (a > b) {return a;}
-	return b;
-}
-
-guchar* addr(unsigned x, unsigned y, GdkPixbuf* image) {
-	unsigned bytes_pp = gdk_pixbuf_get_n_channels(image) * (gdk_pixbuf_get_bits_per_sample(image) / 8);
-	return gdk_pixbuf_get_pixels(image) + ((y * gdk_pixbuf_get_width(image)) + x) * bytes_pp;
-}
-
-unsigned pix_brightness(guchar* base) {
-	unsigned res = 0;
-	res += base[0];
-	res += base[1];
-	res += base[2];
-	return res;
-}
-
-int cmp_brightness(const void* one, const void* two) {
-	int diff = pix_brightness((guchar*) one) - pix_brightness((guchar*) two);
-	if (diff <  0) return -1;
-	else if (diff == 0) return 0;
-	else return 1;
 }
 
 void rescale_image() {
@@ -111,47 +105,6 @@ void gtk_zoom_out() {
 void gtk_zoom_in() {
 	display.scale += 0.1;
 	rescale_image();
-}
-
-void sort_image(GdkPixbuf* image_buf) {
-	printf("Sorting...\n");
-	unsigned sorted_rows = 0;
-	int height = gdk_pixbuf_get_height(image_buf);
-	int width = gdk_pixbuf_get_width(image_buf);
-	for (unsigned y = 0; y < height; y++) {
-		int stages = 0;
-		size_t bp = 0;
-		size_t x = width / 2;
-		x += rand() % (x / 3);
-		for (; x < width; x++) {
-			guchar* base = addr(x, y, image_buf);
-			if (pix_brightness(base) > UP_THRESHOLD) {
-				stages++;
-				bp = x;
-				break;
-			}
-		}
-		for (; x < width; x++) {
-			guchar* base = addr(x, y, image_buf);
-			if (pix_brightness(base) < DOWN_THRESHOLD) {
-				stages++;
-				break;
-			}
-		}
-
-		x += rand() % (400);
-
-		if (stages == 2) {
-			sorted_rows++;
-			qsort(
-					addr(bp, y, image_buf), 
-					x - bp, 
-					(gdk_pixbuf_get_bits_per_sample(image_buf) / 8) * gdk_pixbuf_get_n_channels(image_buf), 
-					cmp_brightness
-				 );
-		}
-	}
-	printf("Sorted\n");
 }
 
 void on_window_main_destroy() {
@@ -221,24 +174,23 @@ void gtk_add_effect() {
 			("OK"), GTK_RESPONSE_ACCEPT,
 			NULL);
 	GtkWidget* content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-	GtkWidget* label = gtk_label_new("Hello, World!");
+	GtkWidget* combo = gtk_combo_box_text_new();
+	for (guchar i = 0; i < effect_num; i++) {
+		gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(combo), NULL, effects[i].name);
+	}
 
 	// Ensure that the dialog box is destroyed when the user responds
-	g_signal_connect_swapped (dialog, "response",
+	g_signal_connect_swapped(dialog, "response",
 			G_CALLBACK(gtk_widget_destroy), dialog);
 
 	// Add the label, and show everything we’ve added
-	gtk_container_add(GTK_CONTAINER(content_area), label);
+	gtk_container_add(GTK_CONTAINER(content_area), combo);
 	
 	gtk_widget_show_all (dialog);
 }
 
 void gtk_effect_select() {
 	printf("effect changed\n");
-}
-
-void gtk_close_effect_chooser() {
-
 }
 
 int main(int argc, char *argv[]) {
