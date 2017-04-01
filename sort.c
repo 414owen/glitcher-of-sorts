@@ -18,6 +18,7 @@ Effect SORT_HORIZONTAL_EFFECT = {
 	.new_settings_dialog = new_sort_dialog,
 	.type = ROW_EFFECT
 };
+
 typedef struct SwappableSetting {
 	void** settings;
 	GtkWidget* setting_ui;
@@ -147,7 +148,6 @@ void gtk_open_image() {
 	gtk_widget_destroy(dialog);
 }
 
-
 void effect_selected_dropdown(GtkComboBox *combo, gpointer this_will_never_be_used) {
 	gint curr = gtk_combo_box_get_entry_text_column(combo);
 	if (swappable_setting.setting_ui != NULL) {
@@ -156,7 +156,6 @@ void effect_selected_dropdown(GtkComboBox *combo, gpointer this_will_never_be_us
 	swappable_setting.setting_ui = effects[curr]->new_settings_dialog(swappable_setting.settings[curr]);
 	gtk_container_add(GTK_CONTAINER(swappable_setting.parent), swappable_setting.setting_ui);
 	gtk_widget_show_all(swappable_setting.setting_ui);
-	printf("%d\n", curr);
 }
 
 void gtk_add_effect() {

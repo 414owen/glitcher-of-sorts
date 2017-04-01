@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef DEBUG
+#define eprintf(...) fprintf(stderr, __VA_ARGS__)
+#else 
+#define eprintf(...)
+#endif
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -57,7 +63,7 @@ typedef struct Effect {
 
 typedef enum SettingType {
 	BOOLEAN_SETTING,
-	UNSIGNED_SETTING
+	RANGE_SETTING
 } SettingType;
 
 unsigned pix_brightness(guchar* base);

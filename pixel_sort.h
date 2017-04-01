@@ -12,9 +12,9 @@ typedef enum SortMode {
 
 typedef struct SortSettings {
 	ImageDeets* deets;
-	unsigned start;
-	unsigned plus_random_start;
-	unsigned random_max;
+	double start;
+	double plus_random_start;
+	double random_max;
 	bool comparator;
 	bool edge_is_threshold;
 	unsigned pixs;

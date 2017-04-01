@@ -8,7 +8,7 @@
 void* new_sort_settings_hor(ImageDeets* deets) {
 	SortSettings* res = malloc(sizeof(SortSettings));
 	res->deets = deets;
-	res->start = 0;
+	res->start = 0.0;
 	res->edge_is_threshold = true;
 	res->up_threshold = 50;
 	res->down_threshold = 200;
@@ -35,17 +35,19 @@ void* new_sort_settings_whole(ImageDeets* deets) {
 
 GtkWidget* new_sort_dialog(void* settings_v) {
 	SortSettings* settings = (SortSettings*) settings_v;
-	SettingType type = UNSIGNED_SETTING;
+	SettingType type = RANGE_SETTING;
 	char* labels[] = {
 		"Starting Point"
 	};
-	int zero = 0;
+	double zero = 0.0;
+	double width_d = (double) settings->deets->width;
+	*(&(settings->start)) = 3.75;
 	void* args[] = {
 		&type,
 		labels[0],
 		&settings->start,
 		&zero,
-		&settings->deets->width,
+		&width_d,
 		NULL
 	};
 
@@ -77,9 +79,7 @@ void sort_horizontal(guchar* data, ImageDeets* deets, void* settings_v) {
 			break;
 		}
 	}
-
 	x += rand() % (400);
-
 	if (stages == 2) {
 		qsort(
 				data + bp * deets->bytes_pp,

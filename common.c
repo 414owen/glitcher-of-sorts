@@ -44,10 +44,15 @@ ImageDeets* get_image_deets(GdkPixbuf* image) {
 	return deets;
 }
 
-
+void range_changed(GtkRange* range, void* user_data) {
+	double d = gtk_range_get_value(range);
+	eprintf("changed: value: %f\n", d);
+	eprintf("changed: user_data: %p\n", user_data);
+	*((double*) user_data) = d;
+}
 
 /*
- * Takes a SettingType, a pointer to its data, then its parameters...
+ * Takes a SettingType, its label, a pointer to its data, then its parameters...
  */
 GtkWidget* generate_settings_ui(void** args) {
 	GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
@@ -59,13 +64,16 @@ GtkWidget* generate_settings_ui(void** args) {
 		gtk_container_add(GTK_CONTAINER(box), label);
 		switch(*((SettingType*) arg_t)) {
 			case BOOLEAN_SETTING: {
-				printf("Bool setting\n");
+				eprintf("Bool setting\n");
 				break;
 			}
-			case UNSIGNED_SETTING: {
-				double initial   = (double) *((unsigned*) args[ind++]);
-				double min_scale = (double) *((unsigned*) args[ind++]);
-				double max_scale = (double) *((unsigned*) args[ind++]);
+			case RANGE_SETTING: {
+				eprintf("Range setting\n");
+				double* value_p  = (double*) args[ind++];
+				double initial   = *value_p;
+				eprintf("initial-gen: %f\n", initial);
+				double min_scale = *((double*) args[ind++]);
+				double max_scale = *((double*) args[ind++]);
 				double step = (double) (max_scale - min_scale) / 20.0;
 				GtkAdjustment* adjustment = gtk_adjustment_new(
 					initial,
@@ -79,12 +87,13 @@ GtkWidget* generate_settings_ui(void** args) {
 					GTK_ORIENTATION_HORIZONTAL,
 					adjustment
 				);
+				eprintf("right before: %p\n", value_p);
+				g_signal_connect(scale, "value_changed", G_CALLBACK(range_changed), value_p);
 				gtk_container_add(GTK_CONTAINER(box), scale);
-				printf("Int setting\n");
 				break;
 			}
 			default: {
-				printf("Unknown argument\n");
+				eprintf("Unknown argument\n");
 				break;
 			}
 		}
