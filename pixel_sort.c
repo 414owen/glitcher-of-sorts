@@ -35,8 +35,9 @@ void* new_sort_settings_whole(ImageDeets* deets) {
 GtkWidget* new_sort_dialog(void* settings_v) {
 	SortSettings* settings = (SortSettings*) settings_v;
 	GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-	
-	return box;
+	GtkWidget* label = gtk_label_new("Hello, World!");
+	printf("Returning label\n");
+	return label;
 }
 
 void sort_horizontal(guchar* data, ImageDeets* deets, void* settings_v) {

@@ -8,55 +8,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct Strings {
-	char* about;
-	const char* comment;
-	const char* logo_path;
-	const char* name;
-	const char* version;
-	const char* website;
-	const char** authors;
-} Strings;
-Strings strings;
+const int effect_num = 1;
 
-// Will be used for pipelining of effects
-typedef enum EffectType {
-	PIXEL_EFFECT,
-	ROW_EFFECT,
-	COLUMN_EFFECT,
-	IMAGE_EFFECT
-} EffectType;
-
-// Used to represent effects in the queue
-typedef struct Effect {
-
-	// Name of the effect
-	char* name;
-
-	// Effect function, takesa pointer to the data, the details, and the settings
-	void (*function) (guchar*, ImageDeets*, void*);
-
-	// Takes details, returns the settings
-	void* (*new_settings_struct) (ImageDeets);
-
-	// Takes settings, returns the settings editor
-	GtkWidget* (*new_settings_dialog) (void*);
-
-	// Defines type of effect, used for effect pipelining
-	EffectType type;
-
-} Effect;
-
-const guchar effect_num = 1;
-Effect effects[] = {
-	{
-		.name = "Horizontal Sort", 
-		.function = sort_horizontal, 
-		.new_settings_struct = new_sort_settings_hor,
-		.new_settings_dialog = new_sort_dialog,
-		.type = ROW_EFFECT
-	}
+Effect SORT_HORIZONTAL_EFFECT = {
+	.name = "Horizontal Sort", 
+	.function = sort_horizontal, 
+	.new_settings_struct = new_sort_settings_hor,
+	.free_settings_struct = free,
+	.new_settings_dialog = new_sort_dialog,
+	.type = ROW_EFFECT
 };
+typedef struct SwappableSetting {
+	void** settings;
+	GtkWidget* setting_ui;
+	GtkContainer* parent;
+} SwappableSetting;
+
+int greyed_no_image_num = 1;
+GtkWidget** greyed_no_image;
+int greyed_no_effect_selected_num = 2;
+GtkWidget** greyed_no_effect_selected;
+Effect** effects;
+ImageDeets* image_deets;
+SwappableSetting swappable_setting;
 
 typedef struct Display {
 	double scale;
@@ -119,16 +93,16 @@ void gtk_about_close(GtkDialog *about_glitcher) {
 
 void gtk_about_show() {
 	gtk_show_about_dialog((GtkWindow*) gui.window,
-		"program-name", strings.name,
-		"logo", gui.logo,
-		"title", strings.about,
-		"license-type", GTK_LICENSE_GPL_3_0,
-		"authors", strings.authors,
-		"version", strings.version,
-		"website", strings.website,
-		"comments", strings.comment,
-		NULL
-		);
+			"program-name", strings.name,
+			"logo", gui.logo,
+			"title", strings.about,
+			"license-type", GTK_LICENSE_GPL_3_0,
+			"authors", strings.authors,
+			"version", strings.version,
+			"website", strings.website,
+			"comments", strings.comment,
+			NULL
+			);
 }
 
 void load_image(const char* in) {
@@ -142,6 +116,13 @@ void load_image(const char* in) {
 	display.scaled_image = display.image;
 	display.scale = 1.0;
 	gtk_image_set_from_pixbuf((GtkImage*) gui.image, display.scaled_image);
+	for (int i = 0; i < greyed_no_image_num; i++) {
+		gtk_widget_set_sensitive(GTK_WIDGET(greyed_no_image[i]), true);
+	}
+	image_deets = get_image_deets(display.image);
+	for (guchar i = 0; i < effect_num; i++) {
+		swappable_setting.settings[i] = effects[i]->new_settings_struct(image_deets);
+	}
 }
 
 void gtk_open_image() {
@@ -161,32 +142,52 @@ void gtk_open_image() {
 		GtkFileChooser *chooser = GTK_FILE_CHOOSER (dialog);
 		filename = gtk_file_chooser_get_filename (chooser);
 		load_image(filename);
-		g_free (filename);
+		g_free(filename);
 	}
 	gtk_widget_destroy(dialog);
 }
 
+
+void effect_selected_dropdown(GtkComboBox *combo, gpointer this_will_never_be_used) {
+	gint curr = gtk_combo_box_get_entry_text_column(combo);
+	if (swappable_setting.setting_ui != NULL) {
+		gtk_container_remove(GTK_CONTAINER(swappable_setting.parent), swappable_setting.setting_ui);
+	}
+	swappable_setting.setting_ui = effects[curr]->new_settings_dialog(swappable_setting.settings[curr]);
+	gtk_container_add(GTK_CONTAINER(swappable_setting.parent), swappable_setting.setting_ui);
+	gtk_widget_show(swappable_setting.setting_ui);
+	printf("%d\n", curr);
+}
+
 void gtk_add_effect() {
+	swappable_setting.setting_ui = NULL;
 	GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT;
 	GtkWidget* dialog = gtk_dialog_new_with_buttons(
 			"Message", GTK_WINDOW(gui.window), flags,
 			("Cancel"), GTK_RESPONSE_REJECT,
 			("OK"), GTK_RESPONSE_ACCEPT,
 			NULL);
+
 	GtkWidget* content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+	swappable_setting.parent = GTK_CONTAINER(content_area);
 	GtkWidget* combo = gtk_combo_box_text_new();
+	gtk_window_set_modal(GTK_WINDOW(dialog), true);
 	for (guchar i = 0; i < effect_num; i++) {
-		gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(combo), NULL, effects[i].name);
+		gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(combo), NULL, effects[i]->name);
 	}
+	g_signal_connect(combo, "changed", G_CALLBACK(effect_selected_dropdown), NULL);
 
 	// Ensure that the dialog box is destroyed when the user responds
 	g_signal_connect_swapped(dialog, "response",
 			G_CALLBACK(gtk_widget_destroy), dialog);
+	gtk_container_add(swappable_setting.parent, combo);
+	gtk_widget_show_all(dialog);
+}
 
-	// Add the label, and show everything we’ve added
-	gtk_container_add(GTK_CONTAINER(content_area), combo);
-	
-	gtk_widget_show_all (dialog);
+void no_effect_selected_grey() {
+	for (int i = 0; i < greyed_no_effect_selected_num; i++) {
+		gtk_widget_set_sensitive(GTK_WIDGET(greyed_no_effect_selected[i]), false);
+	}
 }
 
 void gtk_effect_select() {
@@ -194,6 +195,8 @@ void gtk_effect_select() {
 }
 
 int main(int argc, char *argv[]) {
+
+	// Init Vocabulary
 	strings.comment = "Made with ♥ by Owen";
 	strings.logo_path = "logo.png";
 	strings.name = "Glitcher of Gorts";
@@ -204,6 +207,11 @@ int main(int argc, char *argv[]) {
 		NULL
 	};
 	strings.authors = authors;
+
+	// Init effects
+	effects = malloc(sizeof(Effect*) * effect_num);
+	effects[0] = &SORT_HORIZONTAL_EFFECT;
+
 	GError* e = NULL;
 	gui.logo = gdk_pixbuf_new_from_file(strings.logo_path, &e);
 	char about[24];
@@ -215,6 +223,22 @@ int main(int argc, char *argv[]) {
 	gui.window = GTK_WIDGET(gtk_builder_get_object(gui.builder, "window_main"));
 	gui.image = GTK_WIDGET(gtk_builder_get_object(gui.builder, "image_display"));
 	gtk_builder_connect_signals(gui.builder, NULL);
+
+	// Init greyed
+	greyed_no_image = malloc(sizeof(GtkWidget*) * greyed_no_image_num);
+	greyed_no_image[0] = GTK_WIDGET(gtk_builder_get_object(gui.builder, "add_effect_button"));
+	for (int i = 0; i < greyed_no_image_num; i++) {
+		gtk_widget_set_sensitive(GTK_WIDGET(greyed_no_image[i]), false);
+	}
+
+	// Malloc some settings
+	swappable_setting.settings = malloc(sizeof(void*) * effect_num);
+
+	greyed_no_effect_selected = malloc(sizeof(GtkWidget*) * greyed_no_image_num);
+	greyed_no_effect_selected[0] = GTK_WIDGET(gtk_builder_get_object(gui.builder, "edit_effect_button"));
+	greyed_no_effect_selected[1] = GTK_WIDGET(gtk_builder_get_object(gui.builder, "remove_effect_button"));
+	no_effect_selected_grey();
+
 	gtk_window_present((GtkWindow*) gui.window);
 	gtk_main();
 }
