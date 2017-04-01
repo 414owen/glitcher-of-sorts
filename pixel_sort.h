@@ -11,6 +11,7 @@ typedef enum SortMode {
 } SortMode;
 
 typedef struct SortSettings {
+	ImageDeets* deets;
 	unsigned start;
 	unsigned plus_random_start;
 	unsigned random_max;

@@ -155,7 +155,7 @@ void effect_selected_dropdown(GtkComboBox *combo, gpointer this_will_never_be_us
 	}
 	swappable_setting.setting_ui = effects[curr]->new_settings_dialog(swappable_setting.settings[curr]);
 	gtk_container_add(GTK_CONTAINER(swappable_setting.parent), swappable_setting.setting_ui);
-	gtk_widget_show(swappable_setting.setting_ui);
+	gtk_widget_show_all(swappable_setting.setting_ui);
 	printf("%d\n", curr);
 }
 
@@ -168,6 +168,8 @@ void gtk_add_effect() {
 			("OK"), GTK_RESPONSE_ACCEPT,
 			NULL);
 
+	// TODO figure out resizing
+	gtk_window_set_resizable(GTK_WINDOW(dialog), true);
 	GtkWidget* content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
 	swappable_setting.parent = GTK_CONTAINER(content_area);
 	GtkWidget* combo = gtk_combo_box_text_new();
@@ -178,8 +180,7 @@ void gtk_add_effect() {
 	g_signal_connect(combo, "changed", G_CALLBACK(effect_selected_dropdown), NULL);
 
 	// Ensure that the dialog box is destroyed when the user responds
-	g_signal_connect_swapped(dialog, "response",
-			G_CALLBACK(gtk_widget_destroy), dialog);
+	g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
 	gtk_container_add(swappable_setting.parent, combo);
 	gtk_widget_show_all(dialog);
 }

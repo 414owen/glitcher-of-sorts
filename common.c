@@ -1,5 +1,6 @@
 #include "common.h"
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#include <stdarg.h>
 
 unsigned pix_brightness(guchar* base) {
 	unsigned res = 0;
@@ -41,4 +42,52 @@ ImageDeets* get_image_deets(GdkPixbuf* image) {
 	deets->bytes_pp = (gdk_pixbuf_get_bits_per_sample(image) / 8) * deets->channels;
 	deets->image = gdk_pixbuf_get_pixels(image);
 	return deets;
+}
+
+
+
+/*
+ * Takes a SettingType, a pointer to its data, then its parameters...
+ */
+GtkWidget* generate_settings_ui(void** args) {
+	GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+	int ind = 0;
+	while (args[ind] != NULL) {
+		void* arg_t = args[ind++];
+		char* label_text = (char*) args[ind++];
+		GtkWidget* label = gtk_label_new(label_text);
+		gtk_container_add(GTK_CONTAINER(box), label);
+		switch(*((SettingType*) arg_t)) {
+			case BOOLEAN_SETTING: {
+				printf("Bool setting\n");
+				break;
+			}
+			case UNSIGNED_SETTING: {
+				double initial   = (double) *((unsigned*) args[ind++]);
+				double min_scale = (double) *((unsigned*) args[ind++]);
+				double max_scale = (double) *((unsigned*) args[ind++]);
+				double step = (double) (max_scale - min_scale) / 20.0;
+				GtkAdjustment* adjustment = gtk_adjustment_new(
+					initial,
+                    min_scale,
+                    max_scale,
+                    step,
+                    step,
+                    step
+				);
+				GtkWidget* scale = gtk_scale_new(
+					GTK_ORIENTATION_HORIZONTAL,
+					adjustment
+				);
+				gtk_container_add(GTK_CONTAINER(box), scale);
+				printf("Int setting\n");
+				break;
+			}
+			default: {
+				printf("Unknown argument\n");
+				break;
+			}
+		}
+	}
+	return box;
 }

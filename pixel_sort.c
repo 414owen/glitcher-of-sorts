@@ -7,6 +7,7 @@
 
 void* new_sort_settings_hor(ImageDeets* deets) {
 	SortSettings* res = malloc(sizeof(SortSettings));
+	res->deets = deets;
 	res->start = 0;
 	res->edge_is_threshold = true;
 	res->up_threshold = 50;
@@ -34,10 +35,25 @@ void* new_sort_settings_whole(ImageDeets* deets) {
 
 GtkWidget* new_sort_dialog(void* settings_v) {
 	SortSettings* settings = (SortSettings*) settings_v;
-	GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-	GtkWidget* label = gtk_label_new("Hello, World!");
-	printf("Returning label\n");
-	return label;
+	SettingType type = UNSIGNED_SETTING;
+	char* labels[] = {
+		"Starting Point"
+	};
+	int zero = 0;
+	void* args[] = {
+		&type,
+		labels[0],
+		&settings->start,
+		&zero,
+		&settings->deets->width,
+		NULL
+	};
+
+	/* GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10); */
+	/* GtkWidget* label = gtk_label_new("No settings for now :("); */
+	/* printf("Returning label\n"); */
+	/* return label; */
+	return generate_settings_ui(args);
 }
 
 void sort_horizontal(guchar* data, ImageDeets* deets, void* settings_v) {

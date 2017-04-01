@@ -55,6 +55,11 @@ typedef struct Effect {
 
 } Effect;
 
+typedef enum SettingType {
+	BOOLEAN_SETTING,
+	UNSIGNED_SETTING
+} SettingType;
+
 unsigned pix_brightness(guchar* base);
 int cmp_brightness_gt(const void* one, const void* two);
 int cmp_brightness_lt(const void* one, const void* two);
@@ -63,3 +68,5 @@ guchar* addr(unsigned x, unsigned y, ImageDeets* deets);
 unsigned min(unsigned a, unsigned b);
 unsigned max(unsigned a, unsigned b);
 ImageDeets* get_image_deets(GdkPixbuf*);
+// See definition for usage
+GtkWidget* generate_settings_ui(void**);
