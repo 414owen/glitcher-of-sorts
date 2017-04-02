@@ -41,24 +41,32 @@ typedef enum EffectType {
 // Used to represent effects in the queue
 typedef struct Effect {
 
+	// Defines type of effect, used for effect pipelining
+	EffectType type;
+
 	// Name of the effect
 	char* name;
 
 	// Effect function, takesa pointer to the data, the details, and the settings
-	void (*function) (guchar*, ImageDeets*, void*);
+	void (*function) (guchar*, void*);
 
 	// Takes details, returns the settings
-	void* (*new_settings_struct) (ImageDeets*);
+	void* (*new_settings) (ImageDeets*);
 
 	// In case we need a fancy structures
-	void (*free_settings_struct) (void*);
+	void (*free_settings) (void*);
 
 	// Takes settings, returns the settings editor
 	GtkWidget* (*new_settings_dialog) (void*);
 
-	// Defines type of effect, used for effect pipelining
-	EffectType type;
+	// Ideally, the user will only be presented with options that
+	// can't conflict... Ah well, maybe this will be necessary.
+	// Stores an error in the second argument
+	// This function can also be used for pre-processing the settings
+	bool (*validate) (void*, char**);
 
+	// Creates a copy of its settings
+	void* (*copy_settings) (void*);
 } Effect;
 
 typedef enum SettingType {
