@@ -118,7 +118,7 @@ GtkWidget* new_sort_dialog(void* settings_v) {
 	return generate_settings_ui(args);
 }
 
-void sort_horizontal(guchar* data, void* settings_v) {
+void pixel_sort(guchar* data, void* settings_v) {
 	SortSettings* settings = (SortSettings*) settings_v;
 	int stages = 0;
 	size_t bp = 0;

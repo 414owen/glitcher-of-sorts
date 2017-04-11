@@ -19,11 +19,11 @@ int cmp_brightness_lt(const void* one, const void* two) {
 }
 
 guchar* row_addr(unsigned y, ImageDeets* deets) {
-	return deets->image + y * deets->width * deets->bytes_pp;
+	return deets->pixels + y * deets->width * deets->bytes_pp;
 }
 
 guchar* addr(unsigned x, unsigned y, ImageDeets* deets) {
-	return deets->image + ((y * deets->width) + x) * deets->bytes_pp;
+	return deets->pixels + ((y * deets->width) + x) * deets->bytes_pp;
 }
 
 unsigned min(unsigned a, unsigned b) {
@@ -40,7 +40,8 @@ ImageDeets* get_image_deets(GdkPixbuf* image) {
 	deets->height = gdk_pixbuf_get_height(image);
 	deets->channels = gdk_pixbuf_get_n_channels(image);
 	deets->bytes_pp = (gdk_pixbuf_get_bits_per_sample(image) / 8) * deets->channels;
-	deets->image = gdk_pixbuf_get_pixels(image);
+	deets->image = image;
+	deets->pixels = gdk_pixbuf_get_pixels(image);
 	return deets;
 }
 

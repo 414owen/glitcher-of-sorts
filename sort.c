@@ -14,9 +14,8 @@ const int effect_num = 1;
 
 Effect SORT_HORIZONTAL_EFFECT = {
 	.name = "Horizontal Sort", 
-	.function = sort_horizontal, 
+	.function = pixel_sort, 
 	.new_settings = new_sort_settings_hor,
-	.free_settings = free,
 	.new_settings_dialog = new_sort_dialog,
 	.copy_settings = copy_sort_settings,
 	.type = ROW_EFFECT
@@ -24,8 +23,10 @@ Effect SORT_HORIZONTAL_EFFECT = {
 
 // List store enum
 enum {
-  COL_NAME = 0,
-  NUM_COLS = 1
+	COL_NAME = 0,
+	COL_EFFECT = 1,
+	COL_SETTINGS = 2,
+	NUM_COLS = 3
 };
 
 typedef struct SwappableSetting {
@@ -54,14 +55,29 @@ typedef struct Gui {
 	GtkTreeIter effect_list_iter;
 } Gui;
 
+typedef struct LastEffect {
+	bool batch;
+	EffectType type;
+	int data_num;
+	// takes the data, the function, and the settings
+	void (*apply) (void*, void (*) (guchar*, void*), void*);
+	void* data;
+} LastEffect;
+
 static Display display;
 static Gui gui;
 GtkWidget** greyed_no_image;
 GtkWidget** greyed_no_effect_selected;
 Effect** effects;
 void** effect_settings;
-ImageDeets* image_deets;
 SwappableSetting swappable_setting;
+GdkPixbuf* base_image;
+LastEffect last_effect = {
+	.batch = false,
+	.type = PIXEL_EFFECT,
+	.data_num = 0,
+	.data = NULL
+};
 
 void error(char* message) {
 	fprintf(stderr, "%s\n", message);
@@ -122,6 +138,7 @@ void load_image(const char* in) {
 	printf("Loading file: %s\n", in);
 	GError* e = NULL;
 	display.image = gdk_pixbuf_new_from_file(in, &e);
+	base_image = display.image;
 	if (display.image == NULL) {
 		printf("Couldn't load image :(\n");
 		exit(-1);
@@ -132,7 +149,7 @@ void load_image(const char* in) {
 	for (int i = 0; i < greyed_no_image_num; i++) {
 		gtk_widget_set_sensitive(GTK_WIDGET(greyed_no_image[i]), true);
 	}
-	image_deets = get_image_deets(display.image);
+	ImageDeets* image_deets = get_image_deets(display.image);
 	for (int i = 0; i < effect_num; i++) {
 		effect_settings[i] = (void*) effects[i]->new_settings(image_deets);
 	}
@@ -177,10 +194,13 @@ void effect_add_callback(GtkWidget* widget, gint id, gpointer user_data) {
 	if (id == GTK_RESPONSE_ACCEPT) {
 		gtk_list_store_append(GTK_LIST_STORE(gui.effect_list), &gui.effect_list_iter);
 		gint curr = swappable_setting.effect_ind;
+		void* settings_copy = effects[curr]->copy_settings(effect_settings[curr]);
 		gtk_list_store_set(
 				GTK_LIST_STORE(gui.effect_list), 
 				&gui.effect_list_iter,
 				COL_NAME, effects[curr]->name,
+				COL_EFFECT, &effects[curr],
+				COL_SETTINGS, settings_copy,
 				-1);
 	}
 }
@@ -221,6 +241,64 @@ void no_effect_selected_grey() {
 	}
 }
 
+void apply_col_effect(GdkPixbuf* data, void (*effect) (guchar*, ImageDeets*, void*), void* settings) {
+	ImageDeets* deets = get_image_deets(last_effect.image);
+	for (int i = 0; i < deets->height; i++) {
+		
+	}
+}
+
+gboolean apply_effect(GtkTreeModel *model,
+		GtkTreePath *path,
+		GtkTreeIter *iter,
+		gpointer data) {
+	char* name;
+	Effect* effect;
+	void* settings;
+	gtk_tree_model_get(
+			model, iter,
+			COL_NAME, &name,
+			COL_EFFECT, &effect,
+			COL_SETTINGS, &settings,
+			-1
+			);
+
+	// Batch things if we can (mainly useful when we have to reorder image for
+	// column arrays)
+	if (last_effect.batch) {
+		if (last_effect.type == effect->type) {
+			for (int i = 0; i < data_num; i++) {
+				effect->function(last_effect.data[i], settings);
+			}
+		} else {
+			last_effect.free(last_effect);
+		}
+	} else {
+		switch (effect->type) {
+			case ROW_EFFECT:
+
+			case COLUMN_EFFECT:
+				
+				last_effect.data = gdk_pixbuf_rotate_simple(display.image, GDK_PIXBUF_ROTATE_CLOCKWISE);
+				
+			case PIXEL_EFFECT:
+
+			case IMAGE_EFFECT:
+		}
+	}
+	printf("Applying %s\n", name);
+	free(name);
+	return false;
+}
+
+void gtk_sort() {
+	printf("Building effect list...\n");
+	display.image = base_image;
+	gtk_tree_model_foreach(GTK_TREE_MODEL(gui.effect_list), apply_effect, NULL);
+	rescale_image();
+	printf("Sorting...\n");
+}
+
 int main(int argc, char *argv[]) {
 
 	// Init Vocabulary
@@ -252,7 +330,7 @@ int main(int argc, char *argv[]) {
 	GError* e = NULL;
 	gui.text_renderer = gtk_cell_renderer_text_new();
 	gui.logo = gdk_pixbuf_new_from_file(strings.logo_path, &e);
-	gui.effect_list = GTK_LIST_STORE(gtk_list_store_new(NUM_COLS, G_TYPE_STRING));
+	gui.effect_list = GTK_LIST_STORE(gtk_list_store_new(NUM_COLS, G_TYPE_STRING, G_TYPE_POINTER, G_TYPE_POINTER));
 	gui.effect_list_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(gui.effect_list));
 	gtk_tree_view_insert_column_with_attributes(
 			GTK_TREE_VIEW(gui.effect_list_view),
@@ -263,7 +341,6 @@ int main(int argc, char *argv[]) {
 	gtk_widget_show_all(gui.effect_list_view);
 	gtk_tree_view_set_reorderable(GTK_TREE_VIEW(gui.effect_list_view), true);
 	gui.side_pane = GTK_BOX(gtk_builder_get_object(gui.builder, "side_pane"));
-	/* gtk_container_add(GTK_CONTAINER(gui.side_pane), gui.effect_list_view); */
 	gtk_box_pack_end(gui.side_pane, gui.effect_list_view, true, true, 10);
 
 	// Init greyed

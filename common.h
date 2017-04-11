@@ -27,13 +27,15 @@ typedef struct ImageDeets {
 	unsigned height;
 	unsigned channels;
 	unsigned bytes_pp;
-	guchar* image;
+	GdkPixbuf* image;
+	guchar* pixels;
 } ImageDeets;
 
 // Will be used for pipelining of effects
 typedef enum EffectType {
 	PIXEL_EFFECT,
 	ROW_EFFECT,
+	// Same as row effect, but is fed flipped image
 	COLUMN_EFFECT,
 	IMAGE_EFFECT
 } EffectType;
@@ -47,7 +49,8 @@ typedef struct Effect {
 	// Name of the effect
 	char* name;
 
-	// Effect function, takesa pointer to the data, the details, and the settings
+	// Effect function, takes a pointer to the data, the length of the data, 
+	// and the settings
 	void (*function) (guchar*, void*);
 
 	// Takes details, returns the settings

@@ -32,7 +32,7 @@ typedef struct SortSettings {
 	int (*cmp_func) (const void*, const void*);
 } SortSettings;
 
-void sort_horizontal(guchar*, void*);
+void pixel_sort(guchar*, void*);
 void* new_sort_settings_hor();
 void* new_sort_settings_ver();
 void* new_sort_settings_whole();
