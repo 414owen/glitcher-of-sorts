@@ -18,6 +18,7 @@ Effect SORT_HORIZONTAL_EFFECT = {
 	.new_settings = new_sort_settings_hor,
 	.new_settings_dialog = new_sort_dialog,
 	.copy_settings = copy_sort_settings,
+	.validate = validate_sort_settings,
 	.type = ROW_EFFECT
 };
 
@@ -55,15 +56,6 @@ typedef struct Gui {
 	GtkTreeIter effect_list_iter;
 } Gui;
 
-typedef struct LastEffect {
-	bool batch;
-	EffectType type;
-	int data_num;
-	// takes the data, the function, and the settings
-	void (*apply) (void*, void (*) (guchar*, void*), void*);
-	void* data;
-} LastEffect;
-
 static Display display;
 static Gui gui;
 GtkWidget** greyed_no_image;
@@ -72,12 +64,6 @@ Effect** effects;
 void** effect_settings;
 SwappableSetting swappable_setting;
 GdkPixbuf* base_image;
-LastEffect last_effect = {
-	.batch = false,
-	.type = PIXEL_EFFECT,
-	.data_num = 0,
-	.data = NULL
-};
 
 void error(char* message) {
 	fprintf(stderr, "%s\n", message);
@@ -179,6 +165,7 @@ void gtk_open_image() {
 
 void effect_selected_dropdown(GtkComboBox *combo, GtkWidget* accept) {
 	gint curr = gtk_combo_box_get_entry_text_column(combo);
+	printf("%s effect selected\n", effects[curr]->name);
 	swappable_setting.effect_ind = curr;
 	gtk_widget_set_sensitive(accept, true);
 	if (swappable_setting.setting_ui != NULL) {
@@ -195,13 +182,20 @@ void effect_add_callback(GtkWidget* widget, gint id, gpointer user_data) {
 		gtk_list_store_append(GTK_LIST_STORE(gui.effect_list), &gui.effect_list_iter);
 		gint curr = swappable_setting.effect_ind;
 		void* settings_copy = effects[curr]->copy_settings(effect_settings[curr]);
-		gtk_list_store_set(
-				GTK_LIST_STORE(gui.effect_list), 
-				&gui.effect_list_iter,
-				COL_NAME, effects[curr]->name,
-				COL_EFFECT, &effects[curr],
-				COL_SETTINGS, settings_copy,
-				-1);
+		char* err = NULL;
+		bool success = effects[curr]->validate(settings_copy, &err);
+		if (!success) {
+			fprintf(stderr, "Error, cannot add effect: %s\n", err);
+		} else {
+			printf("%s effect queued\n", effects[curr]->name);
+			gtk_list_store_set(
+					GTK_LIST_STORE(gui.effect_list), 
+					&gui.effect_list_iter,
+					COL_NAME, effects[curr]->name,
+					COL_EFFECT, effects[curr],
+					COL_SETTINGS, settings_copy,
+					-1);
+		}
 	}
 }
 
@@ -241,17 +235,16 @@ void no_effect_selected_grey() {
 	}
 }
 
-void apply_col_effect(GdkPixbuf* data, void (*effect) (guchar*, ImageDeets*, void*), void* settings) {
-	ImageDeets* deets = get_image_deets(last_effect.image);
-	for (int i = 0; i < deets->height; i++) {
-		
-	}
-}
+typedef struct IntermediateEffect {
+	EffectType type;
+	ImageDeets* data;
+} IntermediateEffect;
 
 gboolean apply_effect(GtkTreeModel *model,
 		GtkTreePath *path,
 		GtkTreeIter *iter,
 		gpointer data) {
+	IntermediateEffect* previous = (IntermediateEffect*) data;
 	char* name;
 	Effect* effect;
 	void* settings;
@@ -260,43 +253,63 @@ gboolean apply_effect(GtkTreeModel *model,
 			COL_NAME, &name,
 			COL_EFFECT, &effect,
 			COL_SETTINGS, &settings,
-			-1
-			);
-
-	// Batch things if we can (mainly useful when we have to reorder image for
-	// column arrays)
-	if (last_effect.batch) {
-		if (last_effect.type == effect->type) {
-			for (int i = 0; i < data_num; i++) {
-				effect->function(last_effect.data[i], settings);
-			}
-		} else {
-			last_effect.free(last_effect);
-		}
-	} else {
-		switch (effect->type) {
-			case ROW_EFFECT:
-
-			case COLUMN_EFFECT:
-				
-				last_effect.data = gdk_pixbuf_rotate_simple(display.image, GDK_PIXBUF_ROTATE_CLOCKWISE);
-				
-			case PIXEL_EFFECT:
-
-			case IMAGE_EFFECT:
-		}
+			-1);
+	printf("Applying effect: %s\n", effect->name);
+	ImageDeets* old_deets = previous->data;
+	guchar* pixels = previous->data->pixels;
+	unsigned width = previous->data->width;
+	unsigned height = previous->data->height;
+	unsigned bytes_pp = previous->data->bytes_pp;
+	if (previous->type == COLUMN_EFFECT && effect->type != COLUMN_EFFECT) {
+		previous->data = get_image_deets(gdk_pixbuf_rotate_simple(previous->data->image, GDK_PIXBUF_ROTATE_CLOCKWISE));
 	}
-	printf("Applying %s\n", name);
+	switch (effect->type) {
+		case ROW_EFFECT:
+			for (int i = 0; i < width * height * bytes_pp; i += bytes_pp * width) {
+				effect->function(pixels + i, settings);
+			}
+			break;
+		case COLUMN_EFFECT:
+			if (previous->type != COLUMN_EFFECT) {
+				previous->data = get_image_deets(gdk_pixbuf_rotate_simple(previous->data->image, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE));
+			}
+			for (int i = 0; i < width * height * bytes_pp; i += bytes_pp * width) {
+				effect->function(pixels + i, settings);
+			}
+			break;
+		case PIXEL_EFFECT:
+			for (int i = 0; i < width * height * bytes_pp; i += bytes_pp) {
+				effect->function(pixels + i, settings);
+			}
+			break;
+		case IMAGE_EFFECT:
+			effect->function(pixels, settings);
+			break;
+		default:
+			break;
+	}
+	display.image = previous->data->image;
+	display.scaled_image = previous->data->image;
+	previous->type = effect->type;
 	free(name);
 	return false;
 }
 
 void gtk_sort() {
-	printf("Building effect list...\n");
-	display.image = base_image;
-	gtk_tree_model_foreach(GTK_TREE_MODEL(gui.effect_list), apply_effect, NULL);
-	rescale_image();
 	printf("Sorting...\n");
+	IntermediateEffect intermediate = {
+		.type = NO_EFFECT,
+		.data = get_image_deets(base_image)
+	};
+	display.image = base_image;
+	gtk_tree_model_foreach(GTK_TREE_MODEL(gui.effect_list), apply_effect, &intermediate);
+	if (intermediate.type == COLUMN_EFFECT) {
+		intermediate.data = get_image_deets(gdk_pixbuf_rotate_simple(intermediate.data->image, GDK_PIXBUF_ROTATE_CLOCKWISE));
+	}
+	printf("Sorted image\n");
+	display.image = intermediate.data->image;
+	display.scaled_image = intermediate.data->image;
+	rescale_image();
 }
 
 int main(int argc, char *argv[]) {

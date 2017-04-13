@@ -37,4 +37,5 @@ void* new_sort_settings_hor();
 void* new_sort_settings_ver();
 void* new_sort_settings_whole();
 GtkWidget* new_sort_dialog(void*);
+bool validate_sort_settings(void* settings_v, char**);
 void* copy_sort_settings(void* settings_v);

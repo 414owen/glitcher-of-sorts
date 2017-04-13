@@ -33,6 +33,7 @@ typedef struct ImageDeets {
 
 // Will be used for pipelining of effects
 typedef enum EffectType {
+	NO_EFFECT,
 	PIXEL_EFFECT,
 	ROW_EFFECT,
 	// Same as row effect, but is fed flipped image

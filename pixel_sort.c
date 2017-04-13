@@ -26,7 +26,7 @@ void* new_sort_settings_hor(ImageDeets* deets) {
 	return res;
 }
 
-bool validate_sort_settings(void* settings_v) {
+bool validate_sort_settings(void* settings_v, char** err) {
 	SortSettings* settings = (SortSettings*) settings_v;
 	settings->start = settings->start_d;
 	settings->plus_random_start = settings->plus_random_start_d;
@@ -123,7 +123,9 @@ void pixel_sort(guchar* data, void* settings_v) {
 	int stages = 0;
 	size_t bp = 0;
 	size_t x = settings->start;
-	x += rand() % (settings->plus_random_start);
+	if (settings->plus_random_start > 0) {
+		x += rand() % (settings->plus_random_start);
+	}
 	for (; x < settings->pixs; x++) {
 		guchar* base = data + x * settings->bytes_pp;
 		if (pix_brightness(base) > settings->up_threshold) {
@@ -139,7 +141,9 @@ void pixel_sort(guchar* data, void* settings_v) {
 			break;
 		}
 	}
-	x -= rand() % (settings->minus_random_end);
+	if (settings->minus_random_end > 0) {
+		x -= rand() % (settings->minus_random_end);
+	}
 	if (stages == 2) {
 		qsort(
 				data + bp * settings->bytes_pp,
@@ -148,4 +152,8 @@ void pixel_sort(guchar* data, void* settings_v) {
 				settings->cmp_func
 			 );
 	}
+	// Red test
+	/* for (x = 0; x < settings->pixs; x++) { */
+	/*     *(data + x * settings->bytes_pp) = 255; */
+	/* } */
 }
