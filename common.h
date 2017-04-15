@@ -27,6 +27,7 @@ typedef struct ImageDeets {
 	unsigned height;
 	unsigned channels;
 	unsigned bytes_pp;
+	unsigned rowstride;
 	GdkPixbuf* image;
 	guchar* pixels;
 } ImageDeets;

@@ -40,6 +40,7 @@ ImageDeets* get_image_deets(GdkPixbuf* image) {
 	deets->height = gdk_pixbuf_get_height(image);
 	deets->channels = gdk_pixbuf_get_n_channels(image);
 	deets->bytes_pp = (gdk_pixbuf_get_bits_per_sample(image) / 8) * deets->channels;
+	deets->rowstride = gdk_pixbuf_get_rowstride(image);
 	deets->image = image;
 	deets->pixels = gdk_pixbuf_get_pixels(image);
 	return deets;

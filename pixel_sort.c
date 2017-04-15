@@ -10,8 +10,8 @@ void* new_sort_settings_hor(ImageDeets* deets) {
 	SortSettings* res = malloc(sizeof(SortSettings));
 	res->deets = deets;
 	res->start_d = 0.0;
-	res->up_threshold_d = 50.0;
-	res->down_threshold_d = 200.0;
+	res->up_threshold_d = 200.0;
+	res->down_threshold_d = 20.0;
 
 	// TODO figure this bit out, maybe just make others a separate sort?
 	res->mode = BRIGHTNESS_SORT;
@@ -56,22 +56,22 @@ void* new_sort_settings_whole(ImageDeets* deets) {
 	return res;
 }
 
+char* labels[] = {
+	"Starting Point",
+	"Edge is Threshold",
+	"Start Threshold",
+	"End Threshold",
+	"Plus Start Random",
+	"Minus End Random",
+	"Decreasing Sort"
+};
+
 GtkWidget* new_sort_dialog(void* settings_v) {
 	SortSettings* settings = (SortSettings*) settings_v;
 	SettingType range_type = RANGE_SETTING;
 	SettingType bool_type  = BOOLEAN_SETTING;
-	char* labels[] = {
-		"Starting Point",
-		"Edge is Threshold",
-		"Start Threshold",
-		"End Threshold",
-		"Plus Start Random",
-		"Minus End Random",
-		"Decreasing Sort"
-	};
 	double zero = 0.0;
-	double width_d = (double) settings->deets->width;
-	double max_brightness = 765.0;
+	double width_d = (double) settings->deets->width; double max_brightness = 765.0;
 	void* args[] = {
 
 		&range_type,
@@ -85,7 +85,7 @@ GtkWidget* new_sort_dialog(void* settings_v) {
 		&settings->up_threshold_d,
 		&zero,
 		&max_brightness,
-		
+
 		&range_type,
 		labels[3],
 		&settings->down_threshold_d,
@@ -107,26 +107,46 @@ GtkWidget* new_sort_dialog(void* settings_v) {
 		&bool_type,
 		labels[1],
 		&settings->edge_is_threshold,
-		
+
 		&bool_type,
 		labels[6],
 		&settings->comparator,
-		
+
 		NULL
 	};
 
 	return generate_settings_ui(args);
 }
 
+int lines = 0;
+
+void sort_all(guchar* data, void* settings_v) {
+	
+	/* qsort( */
+	/*         data, */
+	/*         settings->pixs,  */
+	/*         settings->bytes_pp, */
+	/*         settings->cmp_func */
+	/*      ); */
+}
+
 void pixel_sort(guchar* data, void* settings_v) {
 	SortSettings* settings = (SortSettings*) settings_v;
 	int stages = 0;
 	size_t bp = 0;
-	size_t x = settings->start;
+	size_t xs = settings->start;
+	size_t xe = settings->pixs;
 	if (settings->plus_random_start > 0) {
-		x += rand() % (settings->plus_random_start);
+		xs += rand() % settings->plus_random_start;
 	}
-	for (; x < settings->pixs; x++) {
+	if (settings->minus_random_end > 0) {
+		xe -= rand() % settings->minus_random_end;
+	}
+
+	/* printf("Sorting line %d: %zd - %zd\n", lines, xs, xe); */
+	lines++;
+	size_t x;
+	for (x = xs; x < xe; x++) {
 		guchar* base = data + x * settings->bytes_pp;
 		if (pix_brightness(base) > settings->up_threshold) {
 			stages++;
@@ -134,15 +154,12 @@ void pixel_sort(guchar* data, void* settings_v) {
 			break;
 		}
 	}
-	for (; x < settings->pixs; x++) {
+	for (; x < xe; x++) {
 		guchar* base = data + x * settings->bytes_pp;
 		if (pix_brightness(base) < settings->down_threshold) {
 			stages++;
 			break;
 		}
-	}
-	if (settings->minus_random_end > 0) {
-		x -= rand() % (settings->minus_random_end);
 	}
 	if (stages == 2) {
 		qsort(
@@ -152,8 +169,13 @@ void pixel_sort(guchar* data, void* settings_v) {
 				settings->cmp_func
 			 );
 	}
+
 	// Red test
-	/* for (x = 0; x < settings->pixs; x++) { */
-	/*     *(data + x * settings->bytes_pp) = 255; */
-	/* } */
+#ifdef RED_LINE_TEST
+	for (int i = 0; i < 10; i++) {
+		*(data + i * settings->bytes_pp) = 255;
+		*(data + (i + 1) * settings->bytes_pp) = 0;
+		*(data + (i + 2) * settings->bytes_pp) = 0;
+	}
+#endif
 }
