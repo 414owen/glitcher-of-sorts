@@ -5,37 +5,15 @@
 #include <gtk/gtk.h>
 #include <stdbool.h>
 
-typedef enum SortMode {
-	BRIGHTNESS_SORT, 
-	DARKNESS_SORT
-} SortMode;
-
-typedef struct SortSettings {
-	ImageDeets* deets;
-	unsigned start;
-	unsigned plus_random_start;
-	unsigned minus_random_end;
-	unsigned random_max;
-	unsigned up_threshold;
-	unsigned down_threshold;
-	double start_d;
-	double plus_random_start_d;
-	double minus_random_end_d;
-	double random_max_d;
-	double up_threshold_d;
-	double down_threshold_d;
-	bool comparator;
-	bool edge_is_threshold;
-	unsigned pixs;
-	unsigned char bytes_pp;
-	SortMode mode;
-	int (*cmp_func) (const void*, const void*);
-} SortSettings;
-
-void pixel_sort(guchar*, void*);
-void* new_sort_settings_hor();
-void* new_sort_settings_ver();
-void* new_sort_settings_whole();
+GtkWidget* new_full_sort_dialog(void*);
 GtkWidget* new_sort_dialog(void*);
-bool validate_sort_settings(void* settings_v, char**);
-void* copy_sort_settings(void* settings_v);
+bool validate_sort_settings(void*, char**);
+bool validate_sort_settings_full(void*, char**);
+void full_pixel_sort(guchar*, void*);
+void pixel_sort(guchar*, void*);
+void* copy_sort_settings(void*);
+void* copy_full_sort_settings(void*);
+void* new_sort_settings_hor();
+void* new_sort_settings_hor_full(ImageDeets*);
+void* new_sort_settings_ver();
+void* new_sort_settings_ver_full(ImageDeets*);

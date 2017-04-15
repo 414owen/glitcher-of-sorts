@@ -10,10 +10,10 @@
 
 const int greyed_no_image_num = 1;
 const int greyed_no_effect_selected_num = 2;
-const int effect_num = 3;
+const int effect_num = 4;
 
 Effect SORT_HORIZONTAL_EFFECT = {
-	.name = "Horizontal Sort", 
+	.name = "Advanced Horizontal Sort", 
 	.function = pixel_sort, 
 	.new_settings = new_sort_settings_hor,
 	.new_settings_dialog = new_sort_dialog,
@@ -22,18 +22,8 @@ Effect SORT_HORIZONTAL_EFFECT = {
 	.type = ROW_EFFECT
 };
 
-Effect SORT_WHOLE_EFFECT = {
-	.name = "Whole Image Sort", 
-	.function = pixel_sort, 
-	.new_settings = new_sort_settings_whole,
-	.new_settings_dialog = new_sort_dialog,
-	.copy_settings = copy_sort_settings,
-	.validate = validate_sort_settings,
-	.type = IMAGE_EFFECT
-};
-
 Effect SORT_VERTICAL_EFFECT = {
-	.name = "Vertical Sort", 
+	.name = "Advanced Vertical Sort", 
 	.function = pixel_sort, 
 	.new_settings = new_sort_settings_ver,
 	.new_settings_dialog = new_sort_dialog,
@@ -42,13 +32,35 @@ Effect SORT_VERTICAL_EFFECT = {
 	.type = COLUMN_EFFECT
 };
 
+Effect SORT_HORIZONTAL_FULL_EFFECT = {
+	.name = "Full Horizontal Sort", 
+	.function = full_pixel_sort, 
+	.new_settings = new_sort_settings_hor_full,
+	.new_settings_dialog = new_full_sort_dialog,
+	.copy_settings = copy_full_sort_settings,
+	.validate = validate_sort_settings_full,
+	.type = ROW_EFFECT
+};
+
+Effect SORT_VERTICAL_FULL_EFFECT = {
+	.name = "Full Vertical Sort", 
+	.function = full_pixel_sort, 
+	.new_settings = new_sort_settings_ver_full,
+	.new_settings_dialog = new_full_sort_dialog,
+	.copy_settings = copy_full_sort_settings,
+	.validate = validate_sort_settings_full,
+	.type = COLUMN_EFFECT
+};
+
 // List store enum
 enum {
 	COL_NAME = 0,
 	COL_EFFECT = 1,
 	COL_SETTINGS = 2,
-	NUM_COLS = 3
+	COL_IMAGE = 3
 };
+
+int NUM_COLS = 4
 
 typedef struct SwappableSetting {
 	GtkWidget* setting_ui;
@@ -143,17 +155,7 @@ void gtk_about_show() {
 void load_image(const char* in) {
 	printf("Loading file: %s\n", in);
 	GError* e = NULL;
-	GdkPixbuf* temp = gdk_pixbuf_new_from_file(in, &e);
-	display.image = gdk_pixbuf_new_from_data(
-				gdk_pixbuf_get_pixels(temp),
-			 	gdk_pixbuf_get_colorspace(temp),
-				gdk_pixbuf_get_has_alpha(temp),
-				gdk_pixbuf_get_bits_per_sample(temp),
-				gdk_pixbuf_get_width(temp),
-				gdk_pixbuf_get_height(temp),
-				gdk_pixbuf_get_rowstride(temp),
-				NULL,
-				temp);
+	display.image = gdk_pixbuf_new_from_file(in, &e);
 	base_image = display.image;
 	if (display.image == NULL) {
 		printf("Couldn't load image :(\n");
@@ -195,15 +197,6 @@ void gtk_open_image() {
 }
 
 void effect_selected_dropdown(GtkComboBox *combo, GtkWidget* accept) {
-	/* GtkTreeIter iter; */
-	/* gtk_combo_box_get_active_iter(combo, &iter); */
-	/* Effect* effect; */
-	/* void* settings; */
-	/* gtk_tree_model_get( */
-	/*         GTK_TREE_MODEL(gui.effect_list), &iter, */
-	/*         COL_EFFECT, &effect, */
-	/*         COL_SETTINGS, &settings, */
-	/*         -1); */
 	gint curr = gtk_combo_box_get_active(combo);
 	printf("%s effect selected\n", effects[curr]->name);
 	swappable_setting.effect_ind = curr;
@@ -234,6 +227,7 @@ void effect_add_callback(GtkWidget* widget, gint id, gpointer user_data) {
 					COL_NAME, effects[curr]->name,
 					COL_EFFECT, effects[curr],
 					COL_SETTINGS, settings_copy,
+					COL_IMAGE, NULL,
 					-1);
 		}
 	}
@@ -288,12 +282,9 @@ void apply_effect_mutate(EffectType type, void (*function) (guchar*, void*), Ima
 	unsigned bytes_pp = deets->bytes_pp;
 	switch (type) {
 		case ROW_EFFECT:
-			printf("Row effect debug: width: %d, bpp: %d\n", width, bytes_pp);
 			for (unsigned i = 0; i < width * height * bytes_pp; i += deets->rowstride) {
-				/* printf("%d, ", i); */
 				function(pixels + i, settings);
 			}
-			/* function(pixels, settings) */
 			printf("\n");
 			break;
 		case PIXEL_EFFECT:
@@ -337,7 +328,8 @@ ImageDeets* apply_effect(Effect* effect, IntermediateEffect* previous, void* set
 	return deets;
 }
 
-gboolean apply_effect_callback(GtkTreeModel *model,
+gboolean apply_effect_callback(
+		GtkTreeModel *model,
 		GtkTreePath *path,
 		GtkTreeIter *iter,
 		gpointer data) {
@@ -391,7 +383,8 @@ int main(int argc, char *argv[]) {
 	effects = malloc(sizeof(Effect*) * effect_num);
 	effects[0] = &SORT_HORIZONTAL_EFFECT;
 	effects[1] = &SORT_VERTICAL_EFFECT;
-	effects[2] = &SORT_WHOLE_EFFECT;
+	effects[2] = &SORT_HORIZONTAL_FULL_EFFECT;
+	effects[3] = &SORT_VERTICAL_FULL_EFFECT;
 	effect_settings = malloc(sizeof(void*) * effect_num);
 
 	// Init GUI
@@ -404,7 +397,7 @@ int main(int argc, char *argv[]) {
 	GError* e = NULL;
 	gui.text_renderer = gtk_cell_renderer_text_new();
 	gui.logo = gdk_pixbuf_new_from_file(strings.logo_path, &e);
-	gui.effect_list = GTK_LIST_STORE(gtk_list_store_new(NUM_COLS, G_TYPE_STRING, G_TYPE_POINTER, G_TYPE_POINTER));
+	gui.effect_list = GTK_LIST_STORE(gtk_list_store_new(NUM_COLS, G_TYPE_STRING, G_TYPE_POINTER, G_TYPE_POINTER, G_TYPE_POINTER));
 	gui.effect_list_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(gui.effect_list));
 	gtk_tree_view_insert_column_with_attributes(
 			GTK_TREE_VIEW(gui.effect_list_view),
